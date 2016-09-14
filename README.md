@@ -1,1 +1,1 @@
-# workpool
+# CloudFoundry workpool utilities
