@@ -9,6 +9,7 @@ import (
 
 var _ = Describe("Throttler", func() {
 	var throttler *workpool.Throttler
+	var expectedResults []int
 
 	Context("when max workers is non-positive", func() {
 		It("errors", func() {
@@ -53,14 +54,18 @@ var _ = Describe("Throttler", func() {
 					var err error
 					throttler, err = workpool.NewThrottler(maxWorkers, works)
 					Expect(err).NotTo(HaveOccurred())
+					expectedResults = RangeArray(maxWorkers - 1)
 				})
 
 				It("should run the passed-in work", func() {
 					go throttler.Work()
 
+					results := []int{}
 					for i := 0; i < maxWorkers-1; i++ {
-						Eventually(calledChan).Should(Receive(Equal(i)))
+						val := <-calledChan
+						results = append(results, val)
 					}
+					Expect(results).To(ConsistOf(expectedResults))
 				})
 			})
 
@@ -74,14 +79,18 @@ var _ = Describe("Throttler", func() {
 					var err error
 					throttler, err = workpool.NewThrottler(maxWorkers, works)
 					Expect(err).NotTo(HaveOccurred())
+					expectedResults = RangeArray(maxWorkers)
 				})
 
 				It("should run the passed-in work concurrently", func() {
 					go throttler.Work()
 
+					results := []int{}
 					for i := 0; i < maxWorkers; i++ {
-						Eventually(calledChan).Should(Receive(Equal(i)))
+						val := <-calledChan
+						results = append(results, val)
 					}
+					Expect(results).To(ConsistOf(expectedResults))
 				})
 			})
 
@@ -95,14 +104,18 @@ var _ = Describe("Throttler", func() {
 					var err error
 					throttler, err = workpool.NewThrottler(maxWorkers, works)
 					Expect(err).NotTo(HaveOccurred())
+					expectedResults = RangeArray(maxWorkers)
 				})
 
 				It("should run the passed-in work concurrently up to the max number of workers at a time", func() {
 					go throttler.Work()
 
+					results := []int{}
 					for i := 0; i < maxWorkers; i++ {
-						Eventually(calledChan).Should(Receive(Equal(i)))
+						val := <-calledChan
+						results = append(results, val)
 					}
+					Expect(results).To(ConsistOf(expectedResults))
 					Consistently(calledChan).ShouldNot(Receive())
 
 					unblockChan <- struct{}{}

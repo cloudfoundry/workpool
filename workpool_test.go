@@ -28,6 +28,7 @@ var _ = Describe("WorkPool", func() {
 		var calledChan chan int
 		var unblockChan chan struct{}
 		var work func(int) func()
+		var expectedResults []int
 
 		BeforeEach(func() {
 			maxWorkers = 2
@@ -49,39 +50,59 @@ var _ = Describe("WorkPool", func() {
 
 		Describe("Submit", func() {
 			Context("when submitting less work than the max number of workers", func() {
+
+				BeforeEach(func() {
+					expectedResults = RangeArray(maxWorkers - 1)
+				})
+
 				It("should run the passed-in work", func() {
 					for i := 0; i < maxWorkers-1; i++ {
 						pool.Submit(work(i))
 					}
 
+					results := []int{}
 					for i := 0; i < maxWorkers-1; i++ {
-						Eventually(calledChan).Should(Receive(Equal(i)))
+						val := <-calledChan
+						results = append(results, val)
 					}
+					Expect(results).To(ConsistOf(expectedResults))
 				})
 			})
 
 			Context("when submitting work equal to the number of workers", func() {
+				BeforeEach(func() {
+					expectedResults = RangeArray(maxWorkers)
+				})
 				It("should run the passed-in work concurrently", func() {
 					for i := 0; i < maxWorkers; i++ {
 						pool.Submit(work(i))
 					}
 
+					results := []int{}
 					for i := 0; i < maxWorkers; i++ {
-						Eventually(calledChan).Should(Receive(Equal(i)))
+						val := <-calledChan
+						results = append(results, val)
 					}
+					Expect(results).To(ConsistOf(expectedResults))
 				})
 			})
 
 			Context("when submitting more work than the max number of workers", func() {
+				BeforeEach(func() {
+					expectedResults = RangeArray(maxWorkers)
+				})
 				It("should run the passed-in work concurrently up to the max number of workers at a time", func() {
 					for i := 0; i < maxWorkers+1; i++ {
 						pool.Submit(work(i))
 					}
 
+					results := []int{}
 					for i := 0; i < maxWorkers; i++ {
-						Eventually(calledChan).Should(Receive(Equal(i)))
+						val := <-calledChan
+						results = append(results, val)
 					}
-					Consistently(calledChan).ShouldNot(Receive())
+					Expect(results).To(ConsistOf(expectedResults))
+					Consistently(calledChan).ShouldNot(Receive(Equal(maxWorkers)))
 
 					unblockChan <- struct{}{}
 
@@ -91,6 +112,9 @@ var _ = Describe("WorkPool", func() {
 		})
 
 		Describe("Stop", func() {
+			BeforeEach(func() {
+				expectedResults = RangeArray(maxWorkers)
+			})
 			It("does not start any newly-submitted work", func() {
 				pool.Stop()
 				pool.Submit(work(0))
@@ -103,10 +127,13 @@ var _ = Describe("WorkPool", func() {
 					pool.Submit(work(i))
 				}
 
+				results := []int{}
 				for i := 0; i < maxWorkers; i++ {
-					Eventually(calledChan).Should(Receive(Equal(i)))
+					val := <-calledChan
+					results = append(results, val)
 				}
-				Consistently(calledChan).ShouldNot(Receive())
+				Expect(results).To(ConsistOf(expectedResults))
+				Consistently(calledChan).ShouldNot(Receive(Equal(maxWorkers)))
 
 				pool.Stop()
 				unblockChan <- struct{}{}
