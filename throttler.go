@@ -1,4 +1,4 @@
-package workpool
+package workpool // import "code.cloudfoundry.org/workpool"
 
 import (
 	"fmt"
